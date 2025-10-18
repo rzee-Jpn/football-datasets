@@ -1,0 +1,70 @@
+# name: Sync raw data from S3 to repo
+
+# permissions:
+#   contents: write
+
+# on:
+#   push:
+#     branches: [ main ]
+
+#   workflow_dispatch:
+#     inputs:
+#       bucket:
+#         description: 'S3 bucket/prefix (must end with a trailing slash)'
+#         required: false
+
+# jobs:
+#   sync:
+#     runs-on: ubuntu-latest
+#     env:
+#       # Use secret to avoid exposing bucket in the workflow file
+#       BUCKET: ${{ secrets.S3_BUCKET }}
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         with:
+#           persist-credentials: true
+
+#       - name: Setup Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.12'
+
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v2
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ secrets.AWS_REGION }}
+
+#       - name: Sync from S3 to workspace
+#         run: |
+#           mkdir -p datalake/transfermarkt
+#           # allow optional manual override via workflow input, otherwise use secret
+#           if [ -n "${{ github.event.inputs.bucket }}" ]; then
+#             USE_BUCKET="${{ github.event.inputs.bucket }}"
+#           else
+#             USE_BUCKET="${BUCKET}"
+#           fi
+#           aws s3 sync "${USE_BUCKET}" datalake/transfermarkt/raw_s3 --exact-timestamps
+
+#       - name: Merge S3 files into repo raw folder
+#         run: |
+#           mkdir -p datalake/transfermarkt/raw
+#           # Merge S3 content into the repo raw folder without deleting local-only files.
+#           # Use rsync without --delete so files present only in the repo are preserved.
+#           rsync -a datalake/transfermarkt/raw_s3/ datalake/transfermarkt/raw/
+#       - name: Commit and push (if changes)
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           git config user.name "github-actions[bot]"
+#           git config user.email "github-actions[bot]@users.noreply.github.com"
+#           git add datalake/transfermarkt/raw
+#           if git diff --staged --quiet; then
+#             echo "No changes to commit"
+#           else
+#             git commit -m "Sync raw files from S3"
+#             git push origin HEAD:main
+#           fi

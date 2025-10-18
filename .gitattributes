@@ -1,0 +1,2 @@
+datalake/transfermarkt/player_performances/player_performances.csv filter=lfs diff=lfs merge=lfs -text
+datalake/transfermarkt/transfer_history/transfer_history.csv filter=lfs diff=lfs merge=lfs -text
